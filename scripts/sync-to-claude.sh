@@ -3,8 +3,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="${SCRIPT_DIR}/skills"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE_DIR="${REPO_ROOT}/skills"
 DEST_DIR="${CLAUDE_SKILLS_DIR:-${HOME}/.claude/skills}"
+CLAUDE_CLI_BIN="${CLAUDE_CLI_BIN:-claude}"
+CLAUDE_CLI_PROMPT_FLAG="${CLAUDE_CLI_PROMPT_FLAG:--p}"
 DRY_RUN=false
 
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -52,6 +55,22 @@ done
 
 if [[ "${DRY_RUN}" == true ]]; then
   echo "[dry-run] ${synced_count} skill(s) would be synced to ${DEST_DIR}"
-else
-  echo "Done. Synced ${synced_count} skill(s) to ${DEST_DIR}"
+  exit 0
 fi
+
+echo "Done. Synced ${synced_count} skill(s) to ${DEST_DIR}"
+
+shopt -s nullglob
+install_files=("${SOURCE_DIR}"/*/INSTALL.md)
+shopt -u nullglob
+
+if [[ ${#install_files[@]} -eq 0 ]]; then
+  echo "No INSTALL.md files found under ${SOURCE_DIR}."
+  exit 0
+fi
+
+for install_file in "${install_files[@]}"; do
+  prompt="Open and execute the installation steps in ${install_file}."
+  echo "Running Claude install prompt for ${install_file}"
+  "${CLAUDE_CLI_BIN}" "${CLAUDE_CLI_PROMPT_FLAG}" "${prompt}"
+done
